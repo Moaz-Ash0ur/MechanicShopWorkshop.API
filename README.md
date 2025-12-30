@@ -7,7 +7,7 @@ The **Mechanical Workshop Management System** is designed to manage and organize
 The system helps manage:
 
 * **Customers and their Vehicles**
-* **Repair Tasks** associated with each vehicle
+* **Repair Tasks** and Parts need for workOrder
 * **Work Orders** lifecycle and status transitions
 * **Labors / Employees** assignments
 * **Authorization & Access Control** based on roles and policies
