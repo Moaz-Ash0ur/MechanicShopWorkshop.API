@@ -17,7 +17,7 @@ namespace MechanicShop.API.Controllers
 
     [Route("api/v{version:apiVersion}/repair-tasks")]
     [ApiVersion("1.0")]
-  //  [Authorize]
+    [Authorize]
     public class RepairTasksController : ApiController
     {
         private readonly ISender _sender;

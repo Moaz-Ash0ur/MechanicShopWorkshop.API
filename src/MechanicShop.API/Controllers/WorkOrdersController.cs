@@ -25,7 +25,7 @@ namespace MechanicShop.API.Controllers
 {
     [Route("api/v{version:apiVersion}/WorkOrders")]
     [ApiVersion("1.0")]
-   // [Authorize]  
+    [Authorize]  
     public class WorkOrdersController : ApiController
     {
         private readonly ISender _sender;
@@ -89,7 +89,7 @@ namespace MechanicShop.API.Controllers
 
 
         [HttpPost]
-    //    [Authorize(Policy = "ManagerOnly")]
+        [Authorize(Policy = "ManagerOnly")]
         [ProducesResponseType(typeof(WorkOrderDto), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
@@ -112,7 +112,7 @@ namespace MechanicShop.API.Controllers
 
 
         [HttpPut("{workOrderId:guid}/relocation")]
-      // [Authorize(Policy = "ManagerOnly")]
+        [Authorize(Policy = "ManagerOnly")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -131,7 +131,7 @@ namespace MechanicShop.API.Controllers
         }
 
         [HttpPut("{workOrderId:guid}/labor")]
-      //  [Authorize(Policy = "ManagerOnly")]
+        [Authorize(Policy = "ManagerOnly")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -148,7 +148,7 @@ namespace MechanicShop.API.Controllers
         }
 
         [HttpPut("{workOrderId:guid}/state")]
- //       [Authorize(Roles = $"{nameof(Role.Manager)},{nameof(Role.Labor)}", Policy = "SelfScopedWorkOrderAccess")]
+        [Authorize(Roles = $"{nameof(Role.Manager)},{nameof(Role.Labor)}", Policy = "SelfScopedWorkOrderAccess")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -165,7 +165,7 @@ namespace MechanicShop.API.Controllers
         }
 
         [HttpPut("{workOrderId:guid}/repair-task")]
-     //   [Authorize(Roles = nameof(Role.Manager))]
+        [Authorize(Roles = nameof(Role.Manager))]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -185,7 +185,7 @@ namespace MechanicShop.API.Controllers
 
 
         [HttpDelete("{workOrderId:guid}")]
-     //   [Authorize(Policy = "ManagerOnly")]
+        [Authorize(Policy = "ManagerOnly")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]

@@ -13,7 +13,7 @@ namespace MechanicShop.API.Controllers
 {
     [Route("api/v{version:apiVersion}/invoices")]
     [ApiVersion("1.0")]
-  //  [Authorize(Policy = "ManagerOnly")]
+    [Authorize(Policy = "ManagerOnly")]
     public class InvoicesController : ApiController
     {
         private readonly ISender _sender;

@@ -10,8 +10,7 @@ namespace MechanicShop.Api.Controllers;
 
 [Route("api/v{version:apiVersion}/dashboard")]
 [ApiVersion("1.0")]
-//[Authorize]
-
+[Authorize]
 public sealed class DashboardController(ISender sender) : ApiController
 {
     [HttpGet("stats")]

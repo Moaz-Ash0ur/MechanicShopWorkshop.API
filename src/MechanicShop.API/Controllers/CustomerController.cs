@@ -19,7 +19,7 @@ namespace MechanicShop.API.Controllers
 
     [Route("api/v{version:apiVersion}/customers")]
     [ApiVersion("1.0")]
-  //  [Authorize]
+    [Authorize]
     public class CustomerController : ApiController
     {
         private readonly ISender _sender;
