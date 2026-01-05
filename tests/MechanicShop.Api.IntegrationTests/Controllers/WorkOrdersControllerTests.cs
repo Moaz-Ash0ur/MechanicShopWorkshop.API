@@ -2,6 +2,7 @@
 using MechanicShop.Api.IntegrationTests.Common;
 using MechanicShop.Application.Common.Interfaces;
 using MechanicShop.Application.Common.Model;
+using MechanicShop.Application.Features.Scheduling.Dtos;
 using MechanicShop.Application.Features.WorkOrders.Dtos;
 using MechanicShop.Application.Features.WorkOrders.Queries.GetWorkOrders;
 using MechanicShop.Contracts.Requests.WorkOrders;
@@ -396,7 +397,410 @@ namespace MechanicShop.Api.IntegrationTests.Controllers
 
 
 
+        [Fact]
+        public async Task UpdateWorkOrderState_WithValidRequest_ShouldUpdateState()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Manager);
 
+            _client.SetAuthorizationHeader(token);
+
+            var workOrder = WorkOrderTestDataBuilder.Create()
+                        .ForToday()
+                        .WithRepairTasks(await _context.RepairTasks.Take(1).ToListAsync())
+                        .WithVehicle(_context.Vehicles.FirstOrDefault()!.Id)
+                        .WithTimeSlot(DateTimeOffset.UtcNow.AddMinutes(-3), DateTimeOffset.UtcNow.AddMinutes(30))
+                        .WithLabor(TestUsers.Labor01.Id)
+                        .Build();
+
+            _context.WorkOrders.Add(workOrder);
+
+            await _context.SaveChangesAsync(default);
+
+            try
+            {
+                var request = new UpdateWorkOrderStateRequest
+                {
+                    State = Contracts.Common.WorkOrderState.InProgress
+                };
+
+                var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{workOrder.Id}/state", request);
+
+                Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            }
+            finally
+            {
+                await _context.WorkOrders
+                     .Where(w => w.Id == workOrder.Id)
+                     .ExecuteDeleteAsync();
+            }
+        }
+
+        [Fact]
+        public async Task UpdateWorkOrderState_AsLabor_WithSelfScopedAccess_ShouldSucceed()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Labor01);
+
+            _client.SetAuthorizationHeader(token);
+
+            var workOrder = WorkOrderTestDataBuilder.Create()
+              .ForToday()
+              .WithRepairTasks(await _context.RepairTasks.Take(1).ToListAsync())
+              .WithTimeSlot(DateTimeOffset.UtcNow.AddMinutes(-3), DateTimeOffset.UtcNow.AddMinutes(30))
+              .WithLabor(TestUsers.Labor01.Id)
+              .WithVehicle(_context.Vehicles.FirstOrDefault()!.Id)
+              .Build();
+
+            _context.WorkOrders.Add(workOrder);
+
+            await _context.SaveChangesAsync(default);
+
+            try
+            {
+                var request = new UpdateWorkOrderStateRequest
+                {
+                    State = Contracts.Common.WorkOrderState.InProgress
+                };
+
+                var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{workOrder.Id}/state", request);
+
+                Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            }
+            finally
+            {
+                await _context.WorkOrders
+                    .Where(w => w.Id == workOrder.Id)
+                    .ExecuteDeleteAsync();
+            }
+        }
+
+        [Fact]
+        public async Task UpdateWorkOrderState_AsLabor_WithoutSelfScopedAccess_ShouldSucceed()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Labor02);
+
+            _client.SetAuthorizationHeader(token);
+
+            var workOrder = WorkOrderTestDataBuilder.Create()
+             .ForToday()
+             .WithRepairTasks(await _context.RepairTasks.Take(1).ToListAsync())
+             .WithVehicle(_context.Vehicles.FirstOrDefault()!.Id)
+             .WithLabor(TestUsers.Labor01.Id)
+             .Build();
+
+            _context.WorkOrders.Add(workOrder);
+
+            await _context.SaveChangesAsync(default);
+
+            try
+            {
+                var request = new UpdateWorkOrderStateRequest
+                {
+                    State = Contracts.Common.WorkOrderState.InProgress
+                };
+
+                var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{workOrder.Id}/state", request);
+
+                Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            }
+            finally
+            {
+                await _context.WorkOrders
+                     .Where(w => w.Id == workOrder.Id)
+                     .ExecuteDeleteAsync();
+            }
+        }
+
+        [Fact]
+        public async Task UpdateRepairTasks_WithValidRequest_ShouldUpdateTasks()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Manager);
+
+            _client.SetAuthorizationHeader(token);
+
+            var workOrder = WorkOrderTestDataBuilder.Create()
+              .ForToday()
+              .WithRepairTasks(await _context.RepairTasks.Take(1).ToListAsync())
+              .WithVehicle(_context.Vehicles.FirstOrDefault()!.Id)
+              .WithLabor(TestUsers.Labor01.Id)
+              .Build();
+
+            _context.WorkOrders.Add(workOrder);
+
+            await _context.SaveChangesAsync(default);
+
+            var assignedRepairTaskIds = workOrder.RepairTasks.Select(rt => rt.Id).ToHashSet();
+
+            var newRepairTask = await _context.RepairTasks.AsNoTracking()
+                .Where(rt => !assignedRepairTaskIds.Contains(rt.Id))
+                .FirstAsync();
+
+            var request = new ModifyRepairTaskRequest
+            {
+                RepairTaskIds = [newRepairTask.Id]
+            };
+
+            try
+            {
+                var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{workOrder.Id}/repair-task", request);
+
+                Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            }
+            finally
+            {
+                await _context.WorkOrders
+                     .Where(w => w.Id == workOrder.Id)
+                     .ExecuteDeleteAsync();
+            }
+        }
+
+        [Fact]
+        public async Task UpdateRepairTasks_WithoutManagerRole_ShouldReturnForbidden()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Labor01);
+
+            _client.SetAuthorizationHeader(token);
+
+            var workOrderId = Guid.NewGuid();
+
+            var request = new ModifyRepairTaskRequest
+            {
+                RepairTaskIds = [Guid.NewGuid()]
+            };
+
+            var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{workOrderId}/repair-task", request);
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task DeleteWorkOrder_WithValidId_ShouldDeleteWorkOrder()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Manager);
+
+            _client.SetAuthorizationHeader(token);
+
+            var workOrder = WorkOrderTestDataBuilder.Create()
+              .ForToday()
+              .WithRepairTasks(await _context.RepairTasks.Take(1).ToListAsync())
+              .WithVehicle(_context.Vehicles.FirstOrDefault()!.Id)
+              .WithLabor(TestUsers.Labor01.Id)
+              .Build();
+
+            _context.WorkOrders.Add(workOrder);
+
+            await _context.SaveChangesAsync(default);
+
+            try
+            {
+                var response = await _client.DeleteAsync($"/api/v1.0/workorders/{workOrder.Id}");
+
+                Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            }
+            finally
+            {
+                await _context.WorkOrders
+                     .Where(w => w.Id == workOrder.Id)
+                     .ExecuteDeleteAsync();
+            }
+        }
+
+        [Fact]
+        public async Task DeleteWorkOrder_WithInvalidId_ShouldReturnNotFound()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Manager);
+
+            _client.SetAuthorizationHeader(token);
+
+            var nonExistentId = Guid.NewGuid();
+
+            var response = await _client.DeleteAsync($"/api/v1.0/workorders/{nonExistentId}");
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task DeleteWorkOrder_WithoutManagerRole_ShouldReturnForbidden()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Labor01);
+
+            _client.SetAuthorizationHeader(token);
+
+            var workOrderId = Guid.NewGuid();
+
+            var response = await _client.DeleteAsync($"/api/v1.0/workorders/{workOrderId}");
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetSchedule_WithSpecificDate_ShouldReturnSchedule()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Labor01);
+
+            _client.SetAuthorizationHeader(token);
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+            var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1.0/workorders/schedule/{today:yyyy-MM-dd}");
+
+            request.Headers.Add("X-TimeZone", "America/Montreal");
+
+            var response = await _client.SendAsync(request);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var result = await response.Content.ReadFromJsonAsync<ScheduleDto>();
+
+            Assert.NotNull(result);
+        }
+
+        [Fact]
+        public async Task GetSchedule_WithLaborFilter_ShouldReturnFilteredSchedule()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Labor01);
+
+            _client.SetAuthorizationHeader(token);
+
+            var workOrder = WorkOrderTestDataBuilder.Create()
+                           .ForToday()
+                           .WithRepairTasks(await _context.RepairTasks.Take(1).ToListAsync())
+                           .WithVehicle(_context.Vehicles.FirstOrDefault()!.Id)
+                           .WithLabor(TestUsers.Labor01.Id)
+                           .Build();
+
+            _context.WorkOrders.Add(workOrder);
+            await _context.SaveChangesAsync(default);
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1.0/workorders/schedule/{today:yyyy-MM-dd}");
+
+                request.Headers.Add("X-TimeZone", "America/Montreal");
+
+                var response = await _client.SendAsync(request);
+
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+                var result = await response.Content.ReadFromJsonAsync<ScheduleDto>();
+
+                Assert.NotNull(result);
+                Assert.NotNull(result.Spots);
+            }
+            finally
+            {
+                _context.WorkOrders.Remove(workOrder);
+                await _context.SaveChangesAsync(default);
+            }
+        }
+
+        [Fact]
+        public async Task AssignLabor_WithNonExistingWorkOrder_ShouldReturnNotFound()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Manager);
+
+            _client.SetAuthorizationHeader(token);
+
+            var request = new AssignLaborRequest { LaborId = TestUsers.Labor01.Id };
+
+            var nonExistentId = Guid.NewGuid();
+
+            var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{nonExistentId}/labor", request);
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task AssignLabor_WithoutAuthentication_ShouldReturnUnauthorized()
+        {
+            var request = new AssignLaborRequest { LaborId = TestUsers.Labor01.Id };
+            var workOrderId = Guid.NewGuid();
+
+            var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{workOrderId}/labor", request);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task UpdateWorkOrderState_WithInvalidWorkOrderId_ShouldReturnNotFound()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Manager);
+            _client.SetAuthorizationHeader(token);
+
+            var request = new UpdateWorkOrderStateRequest
+            {
+                State = Contracts.Common.WorkOrderState.InProgress
+            };
+
+            var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{Guid.NewGuid()}/state", request);
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task UpdateWorkOrderState_WithoutAuthentication_ShouldReturnUnauthorized()
+        {
+            var request = new UpdateWorkOrderStateRequest
+            {
+                State = Contracts.Common.WorkOrderState.InProgress
+            };
+
+            var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{Guid.NewGuid()}/state", request);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task UpdateRepairTasks_WithInvalidWorkOrderId_ShouldReturnNotFound()
+        {
+            var token = await _client.GenerateTokenAsync(TestUsers.Manager);
+            _client.SetAuthorizationHeader(token);
+
+            var request = new ModifyRepairTaskRequest
+            {
+                RepairTaskIds = [Guid.NewGuid()]
+            };
+
+            var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{Guid.NewGuid()}/repair-task", request);
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task UpdateRepairTasks_WithoutAuthentication_ShouldReturnUnauthorized()
+        {
+            var request = new ModifyRepairTaskRequest
+            {
+                RepairTaskIds = [Guid.NewGuid()]
+            };
+
+            var response = await _client.PutAsJsonAsync($"/api/v1.0/workorders/{Guid.NewGuid()}/repair-task", request);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task DeleteWorkOrder_WithoutAuthentication_ShouldReturnUnauthorized()
+        {
+            var response = await _client.DeleteAsync($"/api/v1.0/workorders/{Guid.NewGuid()}");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetSchedule_WithoutAuthentication_ShouldReturnUnauthorized()
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+            var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1.0/workorders/schedule/{today:yyyy-MM-dd}");
+
+            request.Headers.Add("X-TimeZone", "America/Montreal");
+
+            var response = await _client.SendAsync(request);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
 
 
 
